@@ -1,0 +1,51 @@
+{
+  "name": "360sync",
+  "version": "0.1.0",
+  "description": "Flat/360 video player with synced motorsport time/distance chart",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "node build.js",
+    "installer": "node build.js installer"
+  },
+  "devDependencies": {
+    "electron": "^44.6.0",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.360sync.app",
+    "productName": "360Sync",
+    "publish": null,
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*"
+    ],
+    "directories": {
+      "buildResources": "build"
+    },
+    "win": {
+      "target": "dir",
+      "icon": "build/icon.ico"
+    },
+    "fileAssociations": [
+      {
+        "ext": "360sync",
+        "name": "360Sync.Project",
+        "description": "360Sync Project",
+        "icon": "project"
+      }
+    ],
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "360Sync",
+      "artifactName": "360Sync-Setup-${version}.exe",
+      "differentialPackage": false
+    }
+  }
+}

@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob: vfile:; img-src 'self' data: blob:">
+  <title>360Sync</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="toolbar">
+    <div class="seg modeSw" title="Analyse: video with the telemetry chart · Edit: overlays and driver tags, export to MP4">
+      <button id="appAnalyse" class="on">📊 Analyse</button><button id="appEdit">🎬 Edit</button>
+    </div>
+    <span class="sep"></span>
+    <div class="menuWrap">
+      <button id="btnProject" title="Open or save a project: video, data, sync, overlay and laps in one file">📁 Project ▾</button>
+      <div id="projectMenu" class="menu" hidden>
+        <button id="pmOpen">Open project…<kbd>Ctrl+O</kbd></button>
+        <button id="pmSave">Save project<kbd>Ctrl+S</kbd></button>
+        <button id="pmSaveAs">Save project as…<kbd>Ctrl+Shift+S</kbd></button>
+        <hr>
+        <button id="pmAbout">About 360Sync</button>
+      </div>
+    </div>
+    <button id="btnOpenVideo" title="Open a video file">🎬 Open Video</button>
+    <div class="seg" title="Projection">
+      <button id="modeFlat" class="on">Flat</button><button id="mode360">360°</button>
+    </div>
+    <button id="btnResetView" title="Reset 360 view (or double-click the video)" disabled>⟲ View</button>
+    <button id="btnLock" title="Lock the 360 view orientation and zoom (L)" disabled>🔓 Lock</button>
+    <button id="btnStitch" title="Stitching and image settings for Insta360 video" disabled>⚙ Stitching</button>
+    <span class="sep analyse-only"></span>
+    <button id="btnOpenData" class="analyse-only" title="Open a telemetry CSV">📈 Open Data</button>
+    <label class="analyse-only">X axis
+      <select id="xMode"><option value="time">Time</option><option value="distance">Distance</option></select>
+    </label>
+    <button id="btnOverlay" title="F1-style telemetry overlay on the video">⏱ Overlay</button>
+    <span class="sep"></span>
+    <button id="btnSync" class="sync analyse-only" title="Lock the chart cursor to the current video frame (S)">⛓ Sync</button>
+    <button id="nudgeMinus" class="nudge analyse-only" title="Sync offset -1 frame ( [ ), Shift = 0.1 s" disabled>−</button>
+    <span id="offsetLabel" class="offset">Not synced</span>
+    <button id="nudgePlus" class="nudge analyse-only" title="Sync offset +1 frame ( ] ), Shift = 0.1 s" disabled>+</button>
+    <button id="btnLap" class="edit-only" title="Set up the lap trigger">🏁 Lap trigger</button>
+    <button id="btnExport" class="edit-only primary" title="Export the video with the overlay to an MP4 file" disabled>⤓ Export MP4</button>
+    <span class="grow"></span>
+    <span id="files" class="muted"></span>
+    <input type="file" id="fileVideo" accept="video/*,.mp4,.mov,.m4v,.webm,.mkv,.insv,.lrv" hidden>
+    <input type="file" id="fileData" accept=".csv,.txt,.tsv,.dat" hidden>
+  </header>
+
+  <section id="videoArea">
+    <div id="videoRow">
+    <div id="stage">
+      <video id="video" preload="auto"></video>
+      <div id="videoEmpty" class="empty">Drop a video here, or click <b>Open Video</b><br><small>Flat or equirectangular 360° (MP4 / MOV / WebM), or Insta360 .insv straight off the camera</small></div>
+    </div>
+    <aside id="stitchPanel" class="side" hidden>
+      <h3>Stitching</h3>
+      <label class="opt" title="Matches the two lenses along the seam every frame, so near and far objects both line up"><input type="radio" name="stMode" value="dynamic"> Dynamic</label>
+      <label class="opt" title="Aligns the lenses for one distance (set below)"><input type="radio" name="stMode" value="fixed"> Fixed distance</label>
+      <label class="opt" title="Camera lens calibration only (aligned for far away)"><input type="radio" name="stMode" value="off"> Off</label>
+      <label class="sl" title="Distance the seam is aligned for in Fixed mode">Stitch distance <b id="stDistV"></b><input type="range" id="stDist" min="0" max="100" step="1"></label>
+      <label class="sl" title="Width of the crossfade between the lenses. Narrower is sharper, wider hides misalignment">Fusion angle <b id="stFuseV"></b><input type="range" id="stFuse" min="0.5" max="20" step="0.5"></label>
+      <label class="opt" title="Evens out brightness/colour differences between the two lenses at the seam"><input type="checkbox" id="stColor"> Colour match</label>
+      <h3>Image</h3>
+      <label class="sl" title="Sharpening applied to the stitched picture">Sharpen <b id="stSharpV"></b><input type="range" id="stSharp" min="0" max="100" step="5"></label>
+      <label class="sl" title="Removes purple/blue colour fringes around bright edges">Defringe <b id="stFringeV"></b><input type="range" id="stFringe" min="0" max="100" step="5"></label>
+      <label class="opt" title="Tint the blend band to see where the seam is"><input type="checkbox" id="stSeam"> Show seam</label>
+      <button id="stReset">Reset to defaults</button>
+    </aside>
+    <aside id="overlayPanel" class="side" hidden>
+      <h3>Overlay</h3>
+      <label class="opt" title="Show the telemetry dial over the video"><input type="checkbox" id="ovShow"> Show overlay</label>
+      <h3>Template</h3>
+      <label class="ch" title="Load a saved overlay layout">Template<select id="ovTpl"></select></label>
+      <div class="tplRow"><input type="text" id="ovTplName" maxlength="40" placeholder="Template name" spellcheck="false"><button id="ovTplSave" title="Save the current look, positions and sizes as a template (same name overwrites)">Save</button></div>
+      <button id="ovTplDel" title="Delete the selected template">Delete template</button>
+      <div class="row2"><button id="ovTplExport" title="Save the selected template to a file, to use on another PC or share">Export…</button><button id="ovTplImport" title="Add templates from a .360tpl file">Import…</button></div>
+      <input type="file" id="ovTplFile" accept=".360tpl,.json" hidden>
+      <label class="opt" title="Stop the overlay, driver plate and lap box being moved or resized, so every export matches"><input type="checkbox" id="ovLock"> 🔒 Lock position &amp; size</label>
+      <h3>Channels</h3>
+      <div id="ovChannels" style="display:flex;flex-direction:column;gap:6px"></div>
+      <label class="ch" title="Top of the speed scale. Leave empty for automatic">Speed scale max<input type="number" id="ovSpeedMax" min="0" step="10"></label>
+      <label class="ch" title="Pit lane speed limit, in the overlay's speed unit. Shown while the Pit limiter channel is on or inside a manual pit lane zone">Pit speed limit<input type="number" id="ovPitLimit" min="1" step="1"></label>
+      <button id="btnPit" title="Mark where the pit limiter is on, for data without a pit limiter channel">🚦 Manual pit lane… <span id="pitCount" class="muted"></span></button>
+      <h3>Display</h3>
+      <label class="ch">Style<select id="ovStyle"><option value="dial">F1 dial</option><option value="classic">Classic gauge</option><option value="modern">Modern wheel</option><option value="pod">McLaren pod</option><option value="trace">Pedal trace</option></select></label>
+      <label class="sl" title="Size of the dial (or scroll over it)">Size <b id="ovSizeV"></b><input type="range" id="ovSize" min="15" max="100" step="1"></label>
+      <label class="sl">Opacity <b id="ovOpacityV"></b><input type="range" id="ovOpacity" min="20" max="100" step="5"></label>
+      <small class="muted" id="ovDragHint">Drag the dial to move it, scroll over it to resize.</small>
+      <h3 class="edit-only">Driver</h3>
+      <label class="opt edit-only" title="Show a name plate under the dial"><input type="checkbox" id="ovDriver"> Show driver plate</label>
+      <div id="ovDriverBox" class="edit-only" style="display:flex;flex-direction:column;gap:6px">
+        <label class="ch">Name<input type="text" id="ovName" maxlength="24" placeholder="e.g. L. Norris" spellcheck="false"></label>
+        <div class="row2">
+          <label class="ch">Number<input type="text" id="ovNum" maxlength="3" placeholder="#"></label>
+          <label class="ch">Colour<input type="color" id="ovAccent"></label>
+        </div>
+        <label class="ch">Flag<select id="ovFlag"></select></label>
+        <button id="ovFlagImg" title="Use your own flag or logo image">Custom flag image…</button>
+        <input type="file" id="ovFlagFile" accept="image/*" hidden>
+      </div>
+      <h3>Lap time box</h3>
+      <label class="opt" title="Show the lap time box when a lap trigger fires"><input type="checkbox" id="ovLap"> Show lap time box</label>
+      <label class="sl" title="Size of the lap time box (or scroll over it)">Size <b id="ovLapSizeV"></b><input type="range" id="ovLapSize" min="15" max="100" step="1"></label>
+      <button id="ovLapPos" title="Put the lap time box back at the top centre">Reset box position</button>
+      <small class="muted">While this panel is open the box is shown so you can drag it into place. Add laps with 🏁 Lap trigger in Edit.</small>
+      <button id="ovReset">Reset to defaults</button>
+    </aside>
+    </div>
+    <div class="transport">
+      <button id="btnBack" title="Back one frame (←), Shift = 1 s">⏮</button>
+      <button id="btnPlay" title="Play / pause (Space)">▶</button>
+      <button id="btnFwd" title="Forward one frame (→), Shift = 1 s">⏭</button>
+      <span id="kfBox" class="edit-only kf" hidden title="360 view keyframes: aim the view, then add a keyframe. The view moves smoothly between them in playback and export">
+        <button id="kfPrev" title="Previous keyframe">⟨◆</button><button id="kfAdd" title="Add a keyframe with the current view at the playhead (K)">◆ Keyframe</button><button id="kfDel" title="Delete the keyframe at the playhead · Shift-click: delete all keyframes" disabled>✕</button><button id="kfNext" title="Next keyframe">◆⟩</button>
+      </span>
+      <span class="edit-only kf" title="Trim: the clip's start and end. Playback stops at the out point and the export uses the trimmed clip">
+        <button id="trimIn" title="Set the start (in point) at the playhead (I)">[ In</button><button id="trimOut" title="Set the end (out point) at the playhead (O)">Out ]</button><button id="trimClear" title="Clear the trim" disabled>✕</button>
+      </span>
+      <div class="seekWrap">
+        <input type="range" id="seek" min="0" max="1" step="0.001" value="0">
+        <div id="trimMarks"><span class="shade l"></span><span class="shade r"></span><b class="in" title="Drag to move the start"></b><b class="out" title="Drag to move the end"></b></div>
+        <div id="kfMarks"></div>
+      </div>
+      <span id="timeLabel" class="mono">00:00.000 / 00:00.000</span>
+      <select id="speed" title="Playback speed">
+        <option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option>
+      </select>
+      <button id="btnMute" title="Mute">🔊</button>
+    </div>
+  </section>
+
+  <div id="splitter" title="Drag to resize"></div>
+
+  <section id="chartArea">
+    <aside id="panel">
+      <label>Time column <select id="selTime"></select></label>
+      <label>Time unit
+        <select id="selTimeUnit"><option value="1">s</option><option value="0.001">ms</option><option value="0.000001">µs</option><option value="0.000000001">ns</option></select>
+      </label>
+      <label>Distance <select id="selDist"></select></label>
+      <button id="btnColumns" title="Rename columns and units" disabled>✎ Rename columns</button>
+      <input id="chanFilter" type="search" placeholder="Filter channels…">
+      <div id="chanList"></div>
+    </aside>
+    <div id="chartWrap"><canvas id="chart"></canvas></div>
+  </section>
+
+  <footer class="status analyse-only">
+    Chart: click/drag = move cursor · wheel = zoom · right-drag / Shift-drag = pan · double-click = fit.
+    Sync: line the video and chart cursor up on the same moment, then press <b>Sync</b> (S). Nudge with [ ].
+  </footer>
+  <dialog id="colDialog">
+    <h2>Columns <small id="colFile" class="muted"></small></h2>
+    <div class="colBar"><input id="colFilter" type="search" placeholder="Filter…"><button id="colResetNames" title="Put every column back to its name in the file">Reset names</button></div>
+    <div class="colWrap">
+      <table><thead><tr><th>#</th><th>In file</th><th>Name</th><th>Unit</th><th>Range</th></tr></thead><tbody id="colRows"></tbody></table>
+    </div>
+    <div class="colFoot">
+      <label><input type="checkbox" id="colShowOnLoad"> Show when loading data</label>
+      <span class="grow"></span>
+      <button id="colCancel">Cancel</button><button id="colApply" class="primary">Apply</button>
+    </div>
+  </dialog>
+  <dialog id="lapDialog" class="dlg">
+    <h2>🏁 Lap trigger</h2>
+    <p class="muted">Each trigger shows a lap time box (wipes in, holds 10 s, wipes out) from that video frame. Drag the box to move it.</p>
+      <div class="form">
+        <label class="ch">Trigger at (video time)<span class="lapat"><input type="text" id="lapAt" placeholder="m:ss.mmm" spellcheck="false"><button id="lapNow" title="Use the current video frame">⌖ Current frame</button></span></label>
+        <div class="row2">
+          <label class="ch">Lap time<input type="text" id="lapTime" placeholder="1:32.456" inputmode="numeric" maxlength="8" spellcheck="false" title="Type the digits only: 132456 becomes 1:32.456"></label>
+          <label class="ch">Delta (blank = auto vs fastest)<input type="text" id="lapDelta" placeholder="Auto" spellcheck="false" title="Leave blank to work it out from the fastest lap, or type one to override"></label>
+        </div>
+        <div class="foot"><span class="grow"></span><button id="lapAdd" class="primary">＋ Add lap</button></div>
+        <table id="lapList"></table>
+      </div>
+    <div class="foot"><span class="grow"></span><button id="lapClose" class="primary">Close</button></div>
+  </dialog>
+  <dialog id="aboutDialog" class="dlg about">
+    <img src="icon.png" alt="">
+    <h2>360Sync <small id="aboutVer" class="muted"></small></h2>
+    <p>Flat, 360° and Insta360 video with synced motorsport telemetry, overlays and MP4 export.</p>
+    <p class="muted" id="aboutTech"></p>
+    <div class="foot"><span class="grow"></span><button id="aboutClose" class="primary">Close</button></div>
+  </dialog>
+  <dialog id="pitDialog" class="dlg">
+    <h2>🚦 Manual pit lane</h2>
+    <p class="muted">The overlay shows the pit limiter between each From and To (video time), as well as wherever the data's Pit limiter channel is on.</p>
+      <div class="form">
+        <div class="row2">
+          <label class="ch">From<span class="lapat"><input type="text" id="pitFrom" placeholder="m:ss.mmm" spellcheck="false"><button id="pitFromNow" title="Use the current video frame">⌖ Current frame</button></span></label>
+          <label class="ch">To<span class="lapat"><input type="text" id="pitTo" placeholder="m:ss.mmm" spellcheck="false"><button id="pitToNow" title="Use the current video frame">⌖ Current frame</button></span></label>
+        </div>
+        <div class="foot"><span class="grow"></span><button id="pitAdd" class="primary">＋ Add zone</button></div>
+        <table id="pitList"></table>
+      </div>
+    <div class="foot"><span class="grow"></span><button id="pitClose" class="primary">Close</button></div>
+  </dialog>
+  <dialog id="expDialog" class="dlg">
+    <h2>⤓ Export MP4 <small id="expSrc" class="muted"></small></h2>
+    <div id="expForm" class="form">
+      <label class="ch">Resolution<select id="expRes"></select></label>
+      <div class="row2">
+        <label class="ch" title="Bitrate: higher keeps more detail in fast motion, gravel and grass, at the cost of file size">Quality<select id="expQuality"><option value="standard">Standard</option><option value="high">High</option><option value="max">Maximum</option></select></label>
+        <label class="ch" title="H.265 gives a sharper picture at the same size (and goes up to 8K) but needs a recent GPU, and some older players and editors can't open it">Codec<select id="expCodec"><option value="avc">H.264 (plays anywhere)</option><option value="hevc">H.265 / HEVC (sharper)</option></select></label>
+      </div>
+      <small id="expEst" class="muted mono"></small>
+      <small id="expSharp" class="warn" hidden></small>
+      <label class="ch">Range<select id="expRange"><option value="trim">Trimmed clip</option><option value="all">Whole video</option><option value="data">Telemetry (synced data)</option><option value="custom">Custom</option><option value="laps">Each lap (separate clips)</option></select></label>
+      <div id="expTimes" class="row2">
+        <label class="ch">Start<input type="text" id="expStart" class="mono" spellcheck="false"></label>
+        <label class="ch">End<input type="text" id="expEnd" class="mono" spellcheck="false"></label>
+      </div>
+      <div id="expLaps" hidden>
+        <div class="row2">
+          <label class="ch" title="Seconds of video before the lap starts">Lead-in (s)<input type="number" id="expLead" min="0" max="60" step="0.5" value="2"></label>
+          <label class="ch" title="Seconds of video after the lap ends. 11 s lets the lap time box play out in full">Run-out (s)<input type="number" id="expRunout" min="0" max="60" step="0.5" value="11"></label>
+        </div>
+        <div id="expLapList"></div>
+        <small class="muted">Each lap runs from its trigger minus its lap time up to the trigger. One MP4 per lap: name_Lap01.mp4, name_Lap02.mp4…</small>
+      </div>
+      <label class="opt"><input type="checkbox" id="expAudio" checked> Include audio</label>
+      <small id="expInfo" class="muted"></small>
+    </div>
+    <div id="expProgress" hidden>
+      <div class="bar"><i id="expBar"></i></div>
+      <div id="expStatus" class="muted mono"></div>
+    </div>
+    <div class="foot"><span class="grow"></span><button id="expCancel">Cancel</button><button id="expGo" class="primary">Export…</button></div>
+  </dialog>
+  <div id="toast"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

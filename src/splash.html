@@ -1,0 +1,32 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'">
+<title>360Sync</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; user-select: none; -webkit-app-region: drag; cursor: default; }
+  body { position: relative; transition: opacity .25s; }
+  body.out { opacity: 0; }
+  img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .track { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: rgba(255, 255, 255, .08); }
+  .bar { height: 100%; width: 0; background: linear-gradient(90deg, #ff4d00, #ff8a00 60%, #ffc163); box-shadow: 0 0 10px #ff7a00, 0 0 3px #ffb347; transition: width .3s ease-out; }
+</style>
+</head>
+<body>
+<img src="splash.jpg" alt="360Sync">
+<div class="track"><div class="bar" id="bar"></div></div>
+<script>
+  // creeps towards 90% while the app loads; finish() (called from the main process) fills it
+  const bar = document.getElementById('bar');
+  let p = 0, done = false;
+  const step = () => { if (done) return; p += (90 - p) * 0.06; bar.style.width = p + '%'; setTimeout(step, 50); };
+  step();
+  window.finish = () => new Promise((res) => {
+    done = true;
+    bar.style.width = '100%';
+    setTimeout(() => { document.body.classList.add('out'); setTimeout(res, 250); }, 320);
+  });
+</script>
+</body>
+</html>
