@@ -1,6 +1,6 @@
 // F1-style telemetry dial drawn over the video, driven by the chart cursor time.
 import { interp, nearestIndex, guessSpeedCol } from './telemetry.js';
-import { FLAGS, drawFlag } from './flags.js';
+import { FLAGS, FLAGS_READY, drawFlag } from './flags.js';
 
 const $ = (id) => document.getElementById(id);
 const KEY = 'overlay';
@@ -169,6 +169,7 @@ export class Overlay {
     });
     new ResizeObserver(() => this.layout()).observe(stage);
     MARK.decode().then(() => this.layout(), () => {});
+    FLAGS_READY.then(() => this.layout(), () => {});
   }
 
   setConfig(cfg) {
